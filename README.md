@@ -1,5 +1,5 @@
-# Digital-Marketing  
-## Digital Marketing Analytics Study (4 parts)  
+# Digital-Marketing
+Digital Marketing Analytics Study (4 parts)
 
 Awareness: Online display ads
 Intent: Search ads  
