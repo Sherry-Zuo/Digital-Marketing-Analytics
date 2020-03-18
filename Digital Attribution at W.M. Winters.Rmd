@@ -1,0 +1,230 @@
+---
+title: "Digital Attribution at W.M. Winters"
+subtitle: "Winters Attribution"
+output: pdf_document
+date: "2/20/2020"
+---
+
+**Pairs:** Cohort B: Sherry Zuo, Yishuang Song
+
+The assignment uses the “Winters_Attribution-TERM-SECTION” data. The Winters case study uses a unique dataset was collected in collaboration with a large online media analytics and optimization platform company. The online media company managed the entire campaign of a U.S.-based retailer. The individual-level data set consists of advertising exposures and user-initiated actions, with users tracked across different advertising channels and media. Note that all observations relate to an order (touchpoints that do not lead to a purchase are absent). The unit of observation is an order-touchpoint, so that the same order is repeated by the number of touches.
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(dplyr)
+library(scales)
+```
+   
+```{r}
+load("~/Desktop/BU/BA 860/Winters_Attribution-W20-MSBA-TTh.RData")
+glimpse(data)
+```
+
+
+Q1. (30 pts) Compare first-touch vs. last-touch attribution models    
+
+a) By the different media channels, what is the total number of orders by last-touch (“converter”) and by first-touch (“originator”) attribution? What is the corresponding share of credit for the two attribution models?   
+```{r}
+#Originator->Roaster->Assist->Converter
+## table
+channel <- data %>% 
+  select(Groupname, Positionname) %>% 
+  filter(Positionname == 'CONVERTER' | Positionname == 'ORIGINATOR')
+```
+
+```{r}
+a <- table(channel$Groupname, channel$Positionname)
+a
+```
+```{r}
+b <- prop.table(a,2)*100
+colnames(b) <- c('CONVERTER %','ORIGINATOR %')
+b
+```
+```{r}
+c <- cbind(a,b)
+c
+```
+```{r message=FALSE, warning=FALSE}
+TOTAL <- colSums(c)
+d <- kable(rbind(c,TOTAL))
+d
+```
+
+*Answer:* the total number of orders by last-touch (“converter”) attribution model is **1627**, and by first-touch (“originator”) attribution model is **1627**, the corresponding share of credit for the two attribution models see the table above.    
+
+b) In a single bar plot, plot the share of credit (in percentage) for the first- and last-touch attribution models by marketing channel.   
+```{r}
+E <- as.data.frame(b)
+ggplot(E,aes(x=reorder(Var1,Freq),y=Freq,fill=Var2))+
+  geom_bar(position = 'dodge', stat = 'identity')+
+  labs(x="Marketing Channel", y="Share of Credit (in percentage)")+
+  coord_flip()+
+  scale_fill_discrete(name="Attribution Model:",
+                labels = c("last-touch (CONVERTER)", "first-touch (ORIGINATOR)"))
+```
+
+c) Compare and contrast the two attribution model results. What would be the consequence to Winters if it allocated its marketing budget entirely on the basis of the last-touch attribution model?   
+
+*Answer:* Based on the two attribution model results shown in the graph above, both first-touch and last-touch position are important, because for the top two channels "CPM" and "BUZZ AFFILIATE", both converter and originator count for more than 50% of share of credit. If Winters allocates all marketing budget to "Converter", then channel "CPM", "BUZZ AFFILIATE", and "CJ" will be beneficial. However, it will hurt the channel "Search Google Brand" and "Search MSN Brand". Therefore, it's better to allocate marketing budget on the basis of both first-touch and last-touch attribution models, and allocate more budgets to media channels "BUZZ AFFILIATE", "CJ", "CPM", especially for channel "CPM"      
+
+
+Q2. (20 pts) Compare new customers and old customers      
+
+Hint: The data is structured at the order-touch level, but question 2 asks you to examine the data at the order level. You can do so by filtering the data to only examine “ORIGINATOR” touches.     
+
+a) Using the DaysToConvert variable, what is the average number of days that it takes for a new customer to convert (from the first touchpoint)? What is the average number of days that it takes for an old customer to convert?   
+```{r}
+average_DaysToConvert<-data%>%
+  filter(Positionname == 'ORIGINATOR')%>%
+  group_by(Newcustomer)%>%
+  summarize(average_DaysToConvert=mean(DaysToConvert))
+average_DaysToConvert
+```
+*Answer:* The average number of days that it takes for a **new customer** to convert is **6.32**, the average number of days that it takes for an **old customer** to convert is **29.02** 
+
+b) What is the average number of touchpoints by new versus old customer’s orders?   
+Hint: Use the Touches variable if available. If not, create the Touches variable for the number of touchpoints per order. R users can use the add_count() function. To do so correctly, you need to count touches per orderid before you filter (else, filtering out “ORIGINATOR” touches trivially implies 1 touch per order). 
+```{r}
+average_touchpoints<-data%>%
+  add_count(Orderid, name="Touches")%>%
+  filter(Positionname == 'ORIGINATOR')%>%
+  group_by(Newcustomer)%>%
+  summarize(average_touchpoints=mean(Touches))
+average_touchpoints
+```
+*Answer:* The average number of touchpoints by new customers is **4.34**, the average number of touchpoints by old customers is **5.14**    
+
+c) What is the average order sales amount by new versus old customer’s orders?   
+```{r}
+average_sales<-data%>%
+  filter(Positionname == 'ORIGINATOR')%>%
+  group_by(Newcustomer)%>%
+  summarize(average_sales=mean(Saleamount))
+average_sales
+```
+*Answer:* The average order sales amount by new customers is **266.52**, the average order sales amount by old customers is **205.30**    
+
+d) Summarize how new and old customers differ along these three variables.
+```{r}
+kable(cbind(average_DaysToConvert, average_touchpoints[,2], average_sales[,2]))
+```
+
+*Answer:* For **new customers**, they need 6 days to convert from the first touchpoint, 4 touches on average per order and generate 267 dollars for sales. On contrast, the **old customers** need 29 days to convert, 5 touches on average and generate 205 dollars per sales. **Comparing new and old customers**, we can conclude that new customers need less days to convert, less touches and provide higher sales revenue, while old customers need more days to convert, more touches but generate lower sales revenue. The reason can be that compared to new customers who are unfamiliar with the company, old customers are already aware of all products and therefore advertising seems less attractive to old customers.  
+
+Q3. (20 pts) Consider the revenue per marketing channel. For this question, focus on the originators (first-touch attribution).
+
+a) Create a table (as in Q1) containing the average sales per order as well as the total revenue by originator channel.
+```{r}
+astroc<-data%>%
+  filter(Positionname == 'ORIGINATOR')%>%
+  group_by(Groupname)%>%
+  summarize(average_sales=mean(Saleamount), total_revenue=sum(Saleamount))
+TOTAL<-list('TOTAL', colSums(astroc[2]), colSums(astroc[3]))
+kable(rbind(astroc,TOTAL))
+```
+
+b) What is the total incremental gross revenue accruing to Winters by originator channel? Express your answer in a table. Assume that Winters has a gross margin of 40%. Also assume an incrementality factor of 5% for branded search and 10% for the remaining channels. Note: An incrementality factor refers to the share of sales that are assumed to be incremental or caused by the channel. For instance, an incrementality factor of 20% implies that 0.20 dollars of every 1 dollar in sales is incremental.  
+```{r}
+incremental_gross<-data%>%
+  filter(Positionname == 'ORIGINATOR')%>%
+  group_by(Groupname, Brand)%>%
+  summarize(total_revenue=sum(Saleamount))%>%
+  mutate(incremental_gross=total_revenue*0.4*ifelse(Brand=="Y",0.05, 0.1))
+kable(incremental_gross)
+```
+
+```{r}
+incremental_gross%>%
+  group_by(Brand)%>%
+  summarize(total_incremental_gross=sum(incremental_gross))
+```
+*Answer:* The total incremental gross revenue accruing to Winters by originator channel for each channel shows above, and it is **$3182.67** for branded search channels, **$9125.60** for unbranded search channels, and **$213.58** for Null channels.  
+
+c) You just found out that Winters search ad team spent $4,200 on the branded search advertising covered in the data (e.g. during the time period in the data). What would you advise the search team based on your calculation directly above?   
+
+*Answer:* Base on the calculation, the total incremental gross of branded search is **3182.67** which is less than what Winters search ad-team spent (**$4200**) on branded search advertising, so we advise the search team still loading the branded search advertising but spend less than 3182.67 in case competitors "stolen" touches. 
+
+Q4. (25 pts) Linear/uniform attribution  
+Hint: The linear attribution model divides the attribution share between touches equally. For example, an order with one CPM, one CJ, and one TV touchpoint will have place one third attribution share on each touch. This can be accomplished simply by using the Touches variable (see Q2) to define the new variable: LinearAttributionShare = 1 / Touches    
+
+a) By the different marketing channels, what is the total of the linear attribution shares? What is the corresponding share of credit (in percentage) according to the linear attribution model? Express your answer in a table like in Q1. Hint: By construction, the total linear attribution shares must sum to the total number of orders.  
+```{r}
+linear_attribution_shares<-data%>%
+  add_count(Orderid)%>%
+  mutate(LinearAttributionShare=1/n)%>%
+  group_by(Groupname)%>%
+  summarize(Total_Linear_Attribution_Shares=sum(LinearAttributionShare))
+linear_attribution_shares
+```
+```{r}
+length(unique(data$Orderid))
+total_shares<-sum(linear_attribution_shares$Total_Linear_Attribution_Shares)
+total_shares
+total_shares==length(unique(data$Orderid))
+```
+```{r}
+percentage_share_of_credit<-linear_attribution_shares%>%
+  mutate('Share of Credit %' = Total_Linear_Attribution_Shares*100/total_shares)
+TOTAL<-list('TOTAL', total_shares, 100)
+linear_attribution_model<-rbind(percentage_share_of_credit, TOTAL)
+kable(linear_attribution_model)
+```
+
+*Answer:* The total of the linear attribution shares for all channels is **1627**, and the linear attribution shares of each channel shows in the table above.  The corresponding share of credit (in percentage) according to the linear attribution model also shows in the table above.   
+
+b) In a single bar plot, plot the share of credit (in percentage) for all three attribution models: first-touch, last-touch and linear/uniform.   
+```{r}
+ln=data.frame(Var1=percentage_share_of_credit$Groupname,
+              Var2="linear/uniform",
+              Freq=percentage_share_of_credit$`Share of Credit %`)
+models=rbind(E,ln)
+ggplot(models,aes(x=reorder(Var1,Freq),y=Freq,fill=Var2))+
+  geom_bar(position = 'dodge', stat = 'identity')+
+  labs(x="Marketing Channel", y="Share of Credit (in percentage)", fill = "Position")+
+  coord_flip()+
+  scale_fill_discrete(name="Attribution Model:",
+                      labels = c("last-touch", "first-touch", "linear/uniform"))
+```
+
+c) Compare the linear model to the first-touch and last-touch models.   
+
+*Answer:* Base on the graph, the linear/uniform model is usually between the last-touch model and the first-touch model. The reason is that first-touch and last-touch attribution models only consider one touchpoint through the buying process, while linear/uniform model considers all touchpoints equally in one buying process. It is more reasonable to use the linear/uniform model as it is more comprehensive considering all aspects of users' behaviors during the entire buying process.    
+
+Q5. (30 pts) Examine the role of the intermediate (Roster and Assist) touch points.  
+
+a) Focusing on the top channels listed below, what is the proportion of each channel’s touchpoints by position name: 1) Originator, 2) Roster, 3) Assist, and 4) Converter. For full credit, the rows must be listed in that order.   
+Top channels: “Buzz Affiliate, CJ, CPM, Search Google Brand, Search Google Non-Brand, Search MSN Brand, TV”  
+```{r}
+top_channel <- data%>%
+  add_count(Orderid, name="Touches")%>%
+  filter(Groupname=="BUZZ AFFILIATE" | Groupname=="CJ" | Groupname=="CPM" 
+         |Groupname=="SEARCH GOOGLE BRAND" | Groupname=="SEARCH GOOGLE NON-BRAND" 
+         | Groupname=="SEARCH MSN BRAND" | Groupname=="TV")
+
+f=prop.table(table(top_channel$Groupname, top_channel$Positionname), 1)
+TOTAL <- rowSums(f)
+
+g<-cbind(f, TOTAL)
+#1) Originator, 2) Roster, 3) Assist, and 4) Converter
+h<-g[, c(3,4,1,2,5)]
+kable(h)
+```
+
+b) In a single bar plot, plot the share in percentage (y-axis) of touchpoint types by marketing channels (x-axis).  
+```{r}
+F<-as.data.frame(f)
+F$Var2<-factor(F$Var2, levels=c("ORIGINATOR", "ROSTER", "ASSIST", "CONVERTER"))
+ggplot(F,aes(x=reorder(Var1,Freq),y=Freq*100,fill=Var2))+
+  geom_bar(position = 'dodge', stat = 'identity')+
+  labs(x="Marketing Channel", y="Share of Touchpoint Types (in percentage)", fill = "Position")+
+  theme(axis.text.x=element_text(angle=15))
+```
+
+c) Summarize the touch-point type results. Which channels seem to have relatively more or less of its touchpoints as rosters and assist? As a consequence, which of these channels would receive too much or too little credit under first- and last-touch attribution?     
+
+*Answer:*   
+    Different channels have different distribution for the shares within the buying process of 4 positions. Considering each channel separately, the channel BUZZ AFFILIATE, CJ and TV have the largest shares on “CONVERTER”; channel CPM has the largest shares on “ROSTER”; channel SEARCH GOOGLE BRAND, SEARCH GOOGLE NON-BRAND, and SEARCH MSN BRAND have the largest shares on “ORIGINATOR”.    
+    Channel **'SEARCH GOOGLE NON-BRAND' and 'SEARCH MSN BRAND'** seem to have **relatively less** of its touchpoints as rosters and assist. Channel **'CPM' and 'BUZZ AFFILIATE'** seem to have **relatively more** of its touchpoints as rosters and assist. As a **consequence**, combining the results with absolute difference between 'first- and last-touch' attribution and 'roster and assist' attribution, we think channel CPM would receive too little credit under first- and last-touch attribution, and channel SEARCH GOOGLE NON-BRAND would receive too much credit under first- and last-touch attribution. Therefore, as data analysts, we need to carefully choose the appropriate driving factors in various situation before we determine how to allocate budget for advertising channels and activities.
